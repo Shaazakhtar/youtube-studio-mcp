@@ -21,12 +21,10 @@ from pathlib import Path
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
-REDIRECT_URI = "http://127.0.0.1:8765/oauth2callback"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 SCOPES = [
-    "https://www.googleapis.com/auth/youtube",
+    # youtube.force-ssl already covers everything the youtube and youtube.readonly scopes allow.
     "https://www.googleapis.com/auth/youtube.force-ssl",
-    "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
@@ -72,7 +70,7 @@ class OAuthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.end_headers()
         if self.server.auth_code:
-            body = "<h1>YouTube connection complete.</h1><p>You can return to Codex now.</p>"
+            body = "<h1>YouTube connection complete.</h1><p>You can close this tab and return to your AI assistant.</p>"
         else:
             body = "<h1>YouTube connection failed.</h1><p>Check the terminal for details.</p>"
         self.wfile.write(body.encode("utf-8"))
@@ -81,8 +79,11 @@ class OAuthHandler(BaseHTTPRequestHandler):
         return
 
 
-def run_auth(client_secrets: Path, token_path: Path) -> int:
+def run_auth(client_secrets: Path, token_path: Path, port: int) -> int:
     client = load_client_config(client_secrets)
+    # Port 0 lets the OS pick a free port; Google accepts any loopback port for Desktop clients.
+    server = HTTPServer(("127.0.0.1", port), OAuthHandler)
+    redirect_uri = f"http://127.0.0.1:{server.server_address[1]}/oauth2callback"
     state = secrets.token_urlsafe(24)
     code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(48)).decode("utf-8").rstrip("=")
     code_challenge = (
@@ -93,7 +94,7 @@ def run_auth(client_secrets: Path, token_path: Path) -> int:
     params = urllib.parse.urlencode(
         {
             "client_id": client["client_id"],
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": redirect_uri,
             "response_type": "code",
             "scope": " ".join(SCOPES),
             "access_type": "offline",
@@ -105,7 +106,6 @@ def run_auth(client_secrets: Path, token_path: Path) -> int:
     )
     url = f"{AUTH_URL}?{params}"
 
-    server = HTTPServer(("127.0.0.1", 8765), OAuthHandler)
     thread = threading.Thread(target=server.handle_request, daemon=True)
     thread.start()
 
@@ -135,7 +135,7 @@ def run_auth(client_secrets: Path, token_path: Path) -> int:
         {
             "code": server.auth_code,
             "client_id": client["client_id"],
-            "redirect_uri": REDIRECT_URI,
+            "redirect_uri": redirect_uri,
             "grant_type": "authorization_code",
             "code_verifier": code_verifier,
             **({"client_secret": client["client_secret"]} if client.get("client_secret") else {}),
@@ -143,9 +143,12 @@ def run_auth(client_secrets: Path, token_path: Path) -> int:
     )
     token["created_at"] = int(time.time())
     token_path.parent.mkdir(parents=True, exist_ok=True)
-    with token_path.open("w", encoding="utf-8") as handle:
+    # The token grants channel access, so make it readable by the owner only.
+    fd = os.open(token_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(token, handle, indent=2, sort_keys=True)
         handle.write("\n")
+    os.chmod(token_path, 0o600)
     print(f"Saved OAuth token to {token_path}")
     return 0
 
@@ -161,10 +164,16 @@ def main() -> int:
         "--token-file",
         default=os.environ.get("YOUTUBE_TOKEN_FILE", "secrets/token.json"),
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("YOUTUBE_OAUTH_PORT", "0")),
+        help="Local callback port (default: any free port).",
+    )
     args = parser.parse_args()
     client_secrets = abs_path(args.client_secrets)
     token_path = abs_path(args.token_file)
-    return run_auth(client_secrets, token_path)
+    return run_auth(client_secrets, token_path, args.port)
 
 
 if __name__ == "__main__":

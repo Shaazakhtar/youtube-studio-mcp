@@ -25,8 +25,8 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/i1s-abhishek/youtube-studio-mcp"
-Issues = "https://github.com/i1s-abhishek/youtube-studio-mcp/issues"
+Homepage = "https://github.com/Shaazakhtar/youtube-studio-mcp"
+Issues = "https://github.com/Shaazakhtar/youtube-studio-mcp/issues"
 
 [tool.ruff]
 line-length = 100

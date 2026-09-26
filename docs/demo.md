@@ -5,7 +5,7 @@ This demo uses local OAuth credentials and a local MCP client. Replace paths wit
 ## Setup
 
 ```bash
-git clone https://github.com/i1s-abhishek/youtube-studio-mcp.git
+git clone https://github.com/Shaazakhtar/youtube-studio-mcp.git
 cd youtube-studio-mcp
 mkdir -p secrets
 ```

@@ -5,7 +5,7 @@ The server exposes these MCP tools.
 | Tool | Purpose |
 | --- | --- |
 | `youtube_auth_status` | Check whether local OAuth files exist. |
-| `youtube_start_auth` | Return the auth helper command and OAuth details. |
+| `youtube_start_auth` | Return the command to run for connecting your channel (`python3 scripts/auth.py auth`). |
 | `youtube_channel_overview` | Fetch channel profile, branding, uploads playlist, and public statistics. |
 | `youtube_list_videos` | List recent uploads with metadata, status, statistics, and pagination. |
 | `youtube_get_video` | Fetch metadata for a single video. |

@@ -7,7 +7,7 @@
   <circle cx="58" cy="28" r="8" fill="#ffbd2e"/>
   <circle cx="84" cy="28" r="8" fill="#27c93f"/>
   <text x="120" y="34" fill="#d1d5db" font-family="SFMono-Regular, Consolas, monospace" font-size="16">youtube-studio-mcp demo</text>
-  <text x="36" y="96" fill="#93c5fd" font-family="SFMono-Regular, Consolas, monospace" font-size="18">$ git clone https://github.com/i1s-abhishek/youtube-studio-mcp.git</text>
+  <text x="36" y="96" fill="#93c5fd" font-family="SFMono-Regular, Consolas, monospace" font-size="18">$ git clone https://github.com/Shaazakhtar/youtube-studio-mcp.git</text>
   <text x="36" y="132" fill="#93c5fd" font-family="SFMono-Regular, Consolas, monospace" font-size="18">$ cd youtube-studio-mcp</text>
   <text x="36" y="168" fill="#93c5fd" font-family="SFMono-Regular, Consolas, monospace" font-size="18">$ python3 scripts/auth.py auth</text>
   <text x="36" y="204" fill="#a7f3d0" font-family="SFMono-Regular, Consolas, monospace" font-size="18">Saved OAuth token to secrets/token.json</text>
