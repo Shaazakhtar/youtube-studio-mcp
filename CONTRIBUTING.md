@@ -14,6 +14,7 @@ Thanks for helping improve YouTube Studio MCP.
 
 - Keep secrets, tokens, and channel-specific data out of commits.
 - Prefer small, focused changes.
+- Run `python3 -m unittest discover tests` before opening a PR.
 - Include clear manual test notes for YouTube API behavior.
 - Update `README.md` when changing setup steps, scopes, or available tools.
 

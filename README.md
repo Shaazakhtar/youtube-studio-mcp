@@ -79,6 +79,8 @@ Authenticate with Google:
 python3 scripts/auth.py auth
 ```
 
+The helper listens for Google's callback on a free local port, which works with **Desktop app** OAuth clients. If you use a Web application client with a fixed redirect URI, pass that port explicitly, for example `python3 scripts/auth.py auth --port 8765` (or set `YOUTUBE_OAUTH_PORT`).
+
 Configure your MCP client to run:
 
 ```bash
@@ -160,6 +162,12 @@ The first scope is broad because the server supports write actions as well as re
 - Keep a backup of important titles, descriptions, and tags before bulk updates.
 
 ## Verification
+
+Run the transport tests (standard library only, no Google credentials needed):
+
+```bash
+python3 -m unittest discover tests
+```
 
 Before publishing, this repo was checked to confirm that only `secrets/.gitkeep` is tracked under `secrets/`; real OAuth files such as `secrets/client_secret.json` and `secrets/token.json` are ignored by git.
 
