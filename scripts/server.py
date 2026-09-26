@@ -617,7 +617,12 @@ class McpServer:
     _framed_output = False
 
     @classmethod
-    def _read_message(cls) -> dict[str, Any] | None:
+    def _read_message(cls) -> Any:
+        """Return the next decoded message, or None at end of input.
+
+        Raises ValueError (including json.JSONDecodeError and UnicodeDecodeError)
+        when a message cannot be decoded; the caller answers with a parse error.
+        """
         while True:
             line = sys.stdin.buffer.readline()
             if not line:
@@ -657,16 +662,25 @@ class McpServer:
 
     def serve(self) -> None:
         while True:
-            message = self._read_message()
+            try:
+                message = self._read_message()
+            except ValueError as exc:
+                # One malformed line must not take the whole server down.
+                self._error(None, -32700, f"Parse error: {exc}")
+                continue
             if message is None:
                 return
+            if not isinstance(message, dict):
+                # JSON-RPC batches (arrays) and bare values are not supported.
+                self._error(None, -32600, "Invalid Request: expected a single JSON-RPC object")
+                continue
             message_id = message.get("id")
             method = message.get("method")
             if "id" not in message:
                 continue  # notifications (initialized, cancelled, ...) must never get a reply
             try:
                 if method == "initialize":
-                    requested = message.get("params", {}).get("protocolVersion")
+                    requested = (message.get("params") or {}).get("protocolVersion")
                     self._success(
                         message_id,
                         {
@@ -682,7 +696,7 @@ class McpServer:
                 elif method == "tools/list":
                     self._success(message_id, {"tools": self.tools})
                 elif method == "tools/call":
-                    params = message.get("params", {})
+                    params = message.get("params") or {}
                     try:
                         result = self._call_tool(params["name"], params.get("arguments") or {})
                     except Exception as exc:  # noqa: BLE001
