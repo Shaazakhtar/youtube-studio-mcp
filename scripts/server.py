@@ -19,6 +19,7 @@ from typing import Any
 
 
 PROTOCOL_VERSION = "2024-11-05"
+SUPPORTED_PROTOCOL_VERSIONS = {"2024-11-05", "2025-03-26", "2025-06-18"}
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 REDIRECT_URI = "http://127.0.0.1:8765/oauth2callback"
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -610,28 +611,35 @@ class McpServer:
             )
         raise RuntimeError(f"Unknown tool: {name}")
 
-    @staticmethod
-    def _read_message() -> dict[str, Any] | None:
-        headers: dict[str, str] = {}
+    # MCP stdio transport: one JSON-RPC message per line (newline-delimited JSON).
+    # Content-Length framed input is still accepted for older/LSP-style clients.
+    _framed_output = False
+
+    @classmethod
+    def _read_message(cls) -> dict[str, Any] | None:
         while True:
             line = sys.stdin.buffer.readline()
             if not line:
                 return None
-            if line == b"\r\n":
-                break
-            key, _, value = line.decode("utf-8").partition(":")
-            headers[key.strip().lower()] = value.strip()
-        length = int(headers.get("content-length", "0"))
-        if length <= 0:
-            return None
-        body = sys.stdin.buffer.read(length)
-        return json.loads(body.decode("utf-8"))
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped.lower().startswith(b"content-length:"):
+                length = int(stripped.split(b":", 1)[1].strip())
+                while sys.stdin.buffer.readline().strip():
+                    pass  # skip any remaining headers until the blank line
+                cls._framed_output = True
+                return json.loads(sys.stdin.buffer.read(length).decode("utf-8"))
+            return json.loads(stripped.decode("utf-8"))
 
-    @staticmethod
-    def _write_message(payload: dict[str, Any]) -> None:
+    @classmethod
+    def _write_message(cls, payload: dict[str, Any]) -> None:
         encoded = json.dumps(payload).encode("utf-8")
-        sys.stdout.buffer.write(f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8"))
-        sys.stdout.buffer.write(encoded)
+        if cls._framed_output:
+            sys.stdout.buffer.write(f"Content-Length: {len(encoded)}\r\n\r\n".encode("utf-8"))
+            sys.stdout.buffer.write(encoded)
+        else:
+            sys.stdout.buffer.write(encoded + b"\n")
         sys.stdout.buffer.flush()
 
     def _success(self, message_id: Any, result: dict[str, Any]) -> None:
@@ -653,26 +661,38 @@ class McpServer:
                 return
             message_id = message.get("id")
             method = message.get("method")
+            if "id" not in message:
+                continue  # notifications (initialized, cancelled, ...) must never get a reply
             try:
                 if method == "initialize":
+                    requested = message.get("params", {}).get("protocolVersion")
                     self._success(
                         message_id,
                         {
-                            "protocolVersion": PROTOCOL_VERSION,
+                            "protocolVersion": requested
+                            if requested in SUPPORTED_PROTOCOL_VERSIONS
+                            else PROTOCOL_VERSION,
                             "capabilities": {"tools": {}},
                             "serverInfo": {"name": "youtube-studio-mcp", "version": "0.1.0"},
                         },
                     )
-                elif method == "notifications/initialized":
-                    continue
                 elif method == "ping":
                     self._success(message_id, {})
                 elif method == "tools/list":
                     self._success(message_id, {"tools": self.tools})
                 elif method == "tools/call":
                     params = message.get("params", {})
-                    result = self._call_tool(params["name"], params.get("arguments", {}))
-                    self._success(message_id, {"content": [text_content(json.dumps(result, indent=2))]})
+                    try:
+                        result = self._call_tool(params["name"], params.get("arguments") or {})
+                    except Exception as exc:  # noqa: BLE001
+                        # Tool failures go back as tool results so the model can read and react.
+                        self._success(
+                            message_id, {"content": [text_content(str(exc))], "isError": True}
+                        )
+                    else:
+                        self._success(
+                            message_id, {"content": [text_content(json.dumps(result, indent=2))]}
+                        )
                 else:
                     self._error(message_id, -32601, f"Method not found: {method}")
             except Exception as exc:  # noqa: BLE001
