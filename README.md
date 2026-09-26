@@ -57,7 +57,7 @@ Creators often want AI help with repetitive YouTube Studio work: auditing metada
 Clone the repo:
 
 ```bash
-git clone https://github.com/i1s-abhishek/youtube-studio-mcp.git
+git clone https://github.com/Shaazakhtar/youtube-studio-mcp.git
 cd youtube-studio-mcp
 ```
 
@@ -147,17 +147,15 @@ Upload this local thumbnail image to video VIDEO_ID.
 
 This server requests:
 
-- `https://www.googleapis.com/auth/youtube`
-- `https://www.googleapis.com/auth/youtube.force-ssl`
-- `https://www.googleapis.com/auth/youtube.readonly`
-- `https://www.googleapis.com/auth/yt-analytics.readonly`
+- `https://www.googleapis.com/auth/youtube.force-ssl` (read and manage videos, thumbnails and comments)
+- `https://www.googleapis.com/auth/yt-analytics.readonly` (read YouTube Analytics)
 
-These scopes are broad because the server supports both read and write YouTube Studio actions. Only run this server on machines you trust.
+The first scope is broad because the server supports write actions as well as reads. Only run this server on machines you trust.
 
 ## Safety notes
 
 - Do not commit `secrets/client_secret.json`.
-- Do not commit `secrets/token.json`.
+- Do not commit `secrets/token.json`. The auth helper saves it readable only by your user account.
 - Review tool calls before allowing metadata updates or comments.
 - Keep a backup of important titles, descriptions, and tags before bulk updates.
 
@@ -178,7 +176,7 @@ mcp, model-context-protocol, youtube, youtube-api, youtube-analytics, youtube-st
 Maintainers can publish or update the GitHub repository with:
 
 ```bash
-scripts/publish_github.sh i1s-abhishek youtube-studio-mcp
+scripts/publish_github.sh Shaazakhtar youtube-studio-mcp
 ```
 
 The script creates a public GitHub repo if needed, pushes `main`, and applies relevant discovery topics.

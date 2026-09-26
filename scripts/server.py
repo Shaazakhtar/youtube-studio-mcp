@@ -3,11 +3,9 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import mimetypes
 import os
-import secrets
 import sys
 import time
 import urllib.error
@@ -21,18 +19,18 @@ from typing import Any
 PROTOCOL_VERSION = "2024-11-05"
 SUPPORTED_PROTOCOL_VERSIONS = {"2024-11-05", "2025-03-26", "2025-06-18"}
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-REDIRECT_URI = "http://127.0.0.1:8765/oauth2callback"
-AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 YOUTUBE_API_BASE = "https://www.googleapis.com/youtube/v3"
 YOUTUBE_UPLOAD_BASE = "https://www.googleapis.com/upload/youtube/v3"
 YOUTUBE_ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2"
 SCOPES = [
-    "https://www.googleapis.com/auth/youtube",
+    # youtube.force-ssl already covers everything the youtube and youtube.readonly scopes allow.
     "https://www.googleapis.com/auth/youtube.force-ssl",
-    "https://www.googleapis.com/auth/youtube.readonly",
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
+PRIVACY_STATUSES = ("public", "private", "unlisted")
+# Fields YouTube returns in `status` but does not accept back on videos.update.
+READ_ONLY_STATUS_FIELDS = ("uploadStatus", "failureReason", "rejectionReason", "madeForKids")
 
 
 def text_content(text: str) -> dict[str, Any]:
@@ -57,11 +55,14 @@ def read_json(path: Path) -> dict[str, Any]:
         return json.load(handle)
 
 
-def write_json(path: Path, payload: dict[str, Any]) -> None:
+def write_json(path: Path, payload: dict[str, Any], *, private: bool = False) -> None:
     ensure_parent(path)
-    with path.open("w", encoding="utf-8") as handle:
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600 if private else 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
+    if private:
+        os.chmod(path, 0o600)
 
 
 def http_json(
@@ -131,7 +132,7 @@ class AuthConfig:
         return read_json(self.token_path)
 
     def save_token(self, payload: dict[str, Any]) -> None:
-        write_json(self.token_path, payload)
+        write_json(self.token_path, payload, private=True)
 
     def auth_status(self) -> dict[str, Any]:
         return {
@@ -287,9 +288,17 @@ class YouTubeClient:
         default_language: str | None = None,
         privacy_status: str | None = None,
     ) -> dict[str, Any]:
+        if privacy_status is not None and privacy_status not in PRIVACY_STATUSES:
+            raise RuntimeError(
+                f"privacy_status must be one of {', '.join(PRIVACY_STATUSES)}; got {privacy_status!r}."
+            )
         existing = self.get_video(video_id)
         snippet = existing["snippet"]
-        status = existing["status"]
+        status = {
+            key: value
+            for key, value in existing["status"].items()
+            if key not in READ_ONLY_STATUS_FIELDS
+        }
         snippet["title"] = title if title is not None else snippet.get("title", "")
         snippet["description"] = (
             description if description is not None else snippet.get("description", "")
@@ -302,6 +311,9 @@ class YouTubeClient:
             snippet["defaultLanguage"] = default_language
         if privacy_status is not None:
             status["privacyStatus"] = privacy_status
+            if privacy_status != "private":
+                # A scheduled publish time is only valid on private videos; YouTube rejects it otherwise.
+                status.pop("publishAt", None)
         body = {
             "id": video_id,
             "snippet": snippet,
@@ -428,7 +440,7 @@ class McpServer:
             },
             {
                 "name": "youtube_start_auth",
-                "description": "Generate the OAuth authorization URL and local auth command.",
+                "description": "Explain how to connect a YouTube channel (the local auth command to run).",
                 "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
             },
             {
@@ -470,7 +482,7 @@ class McpServer:
                         "tags": {"type": "array", "items": {"type": "string"}},
                         "category_id": {"type": "string"},
                         "default_language": {"type": "string"},
-                        "privacy_status": {"type": "string"},
+                        "privacy_status": {"type": "string", "enum": list(PRIVACY_STATUSES)},
                     },
                     "required": ["video_id"],
                     "additionalProperties": False,
@@ -545,31 +557,20 @@ class McpServer:
         ]
 
     def _start_auth_payload(self) -> dict[str, Any]:
+        # Login needs a local callback listener, so it must run through the auth helper.
         status = self.auth.auth_status()
-        if not status["client_secrets_exists"]:
-            raise RuntimeError(
-                "client_secret.json is missing. Add your Google OAuth desktop client JSON first."
-            )
-        client = self.auth.load_client_config()
-        state = secrets.token_urlsafe(24)
-        params = urllib.parse.urlencode(
-            {
-                "client_id": client["client_id"],
-                "redirect_uri": REDIRECT_URI,
-                "response_type": "code",
-                "scope": " ".join(SCOPES),
-                "access_type": "offline",
-                "prompt": "consent",
-                "state": state,
-            }
-        )
         helper = PLUGIN_ROOT / "scripts" / "auth.py"
         return {
-            "authorization_url": f"{AUTH_URL}?{params}",
-            "token_path": status["token_path"],
+            "client_secrets_exists": status["client_secrets_exists"],
             "client_secrets_path": status["client_secrets_path"],
+            "token_path": status["token_path"],
             "helper_command": f"python3 {helper} auth",
-            "redirect_uri": REDIRECT_URI,
+            "next_step": (
+                "Run helper_command in a terminal; it opens Google sign-in and saves the token."
+                if status["client_secrets_exists"]
+                else "Save your Google OAuth Desktop client JSON at client_secrets_path, "
+                "then run helper_command."
+            ),
         }
 
     def _call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:

@@ -6,7 +6,7 @@
     "name": "Abhishek Pandey",
     "url": "https://github.com/i1s-abhishek"
   },
-  "homepage": "https://github.com/i1s-abhishek/youtube-studio-mcp",
+  "homepage": "https://github.com/Shaazakhtar/youtube-studio-mcp",
   "license": "MIT",
   "keywords": [
     "youtube",
@@ -22,7 +22,7 @@
     "longDescription": "Connect your YouTube channel with Google OAuth so Codex can inspect channel performance, update titles and descriptions, manage tags, and upload thumbnails through a local MCP server.",
     "developerName": "Abhishek Pandey",
     "category": "Productivity",
-    "websiteURL": "https://github.com/i1s-abhishek/youtube-studio-mcp",
+    "websiteURL": "https://github.com/Shaazakhtar/youtube-studio-mcp",
     "privacyPolicyURL": "https://policies.google.com/privacy",
     "termsOfServiceURL": "https://www.youtube.com/t/terms",
     "defaultPrompt": [

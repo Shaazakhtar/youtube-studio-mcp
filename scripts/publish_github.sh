@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-OWNER="${1:-i1s-abhishek}"
+OWNER="${1:-Shaazakhtar}"
 REPO="${2:-youtube-studio-mcp}"
 DESCRIPTION="Local MCP server for YouTube metadata, thumbnails, comments, and analytics."
 TOPICS="mcp,model-context-protocol,youtube,youtube-api,youtube-analytics,youtube-studio,ai-tools,creator-tools,python"

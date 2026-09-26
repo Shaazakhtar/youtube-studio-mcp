@@ -13,7 +13,7 @@ YouTube Studio MCP is a local Model Context Protocol server that lets AI assista
 ## Directory submission
 
 - Name: YouTube Studio MCP
-- Repository: https://github.com/i1s-abhishek/youtube-studio-mcp
+- Repository: https://github.com/Shaazakhtar/youtube-studio-mcp
 - Category: Media and Entertainment
 - Features: API Management, Data Summarization and Analysis, Media and Entertainment
 - Language: Python
@@ -35,7 +35,7 @@ It can:
 
 It runs locally, uses your own Google OAuth credentials, and does not send tokens to any hosted backend.
 
-GitHub: https://github.com/i1s-abhishek/youtube-studio-mcp
+GitHub: https://github.com/Shaazakhtar/youtube-studio-mcp
 
 Feedback welcome from YouTube creators and MCP builders.
 ```
